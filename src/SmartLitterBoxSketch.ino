@@ -29,7 +29,7 @@ WiFiClientSecure client;
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 
 // io.adafruit.com SHA1 fingerprint
-static const char *fingerprint PROGMEM = "59 3C 48 0A B1 8B 39 4E 0D 58 50 47 9A 13 55 60 CC A0 1D AF";
+static const char *fingerprint PROGMEM = "4E C1 52 73 24 A8 36 D6 7A 4C 67 C7 91 0C 0A 22 B9 2D 5B CA";
 
 Adafruit_MQTT_Publish catWeightFeed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/catWeight");
 Adafruit_MQTT_Publish poopWeightFeed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/poopWeight");
