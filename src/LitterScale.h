@@ -12,10 +12,10 @@ class LitterScale
         Signal<float> WeightChanged;
     
     private:
-        const float ZERO_FACTOR_A = -97991.f;
-        const float CALIBRATION_FACTOR_A = -74500.00f;
-        const float ZERO_FACTOR_B = 140274.f;
-        const float CALIBRATION_FACTOR_B = -99500.00f;
+        const float ZERO_FACTOR_A = -117669.f;
+        const float CALIBRATION_FACTOR_A = -76500.00f;
+        const float ZERO_FACTOR_B = 161988.f;
+        const float CALIBRATION_FACTOR_B = -98500.00f;
 
         const int SCALE_SAMPLE_COUNT = 20;
         const int LOADCELL_DOUT_PIN_A = 2;
