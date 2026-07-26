@@ -6,6 +6,9 @@
 #include "MqttHandler.h"
 #include "SmartLitterBox.h"
 
+// Forward declaration
+void OnNewReading(CatLitterUse catLitterUse);
+
 // MQTT handler instance
 MqttHandler mqttHandler;
 

@@ -21,19 +21,19 @@
 #define MQTT_MAX_TOPIC_LEN    256
 #define MQTT_MAX_PAYLOAD_LEN  256
 
-// MQTT connection states
+// MQTT connection states (renamed to avoid PubSubClient macro conflicts)
 enum MqttConnectionState {
-    MQTT_DISCONNECTED,
-    MQTT_CONNECTING,
-    MQTT_CONNECTED,
-    MQTT_FAILED
+    MQTT_STATE_DISCONNECTED,
+    MQTT_STATE_CONNECTING,
+    MQTT_STATE_CONNECTED,
+    MQTT_STATE_FAILED
 };
 
 // WiFi connection states
 enum WiFiConnectionState {
-    WIFI_DISCONNECTED,
-    WIFI_CONNECTING,
-    WIFI_CONNECTED
+    WIFI_STATE_DISCONNECTED,
+    WIFI_STATE_CONNECTING,
+    WIFI_STATE_CONNECTED
 };
 
 // Publish queue entry structure
@@ -97,8 +97,8 @@ public:
 // Constructor
 MqttHandler::MqttHandler() 
     : mqttClient(espClient),
-      mqttState(MQTT_DISCONNECTED),
-      wifiState(WIFI_DISCONNECTED),
+      mqttState(MQTT_STATE_DISCONNECTED),
+      wifiState(WIFI_STATE_DISCONNECTED),
       lastMqttAttempt(0),
       lastWifiAttempt(0),
       deviceStartTime(0),
@@ -135,15 +135,15 @@ void MqttHandler::setup() {
 void MqttHandler::tick() {
     // Check WiFi status
     if (WiFi.status() != WL_CONNECTED) {
-        if (wifiState == WIFI_CONNECTED) {
+        if (wifiState == WIFI_STATE_CONNECTED) {
             Serial.println("WiFi disconnected!");
-            wifiState = WIFI_DISCONNECTED;
+            wifiState = WIFI_STATE_DISCONNECTED;
             lastWifiAttempt = millis();
             wifiBackoffLevel = 0;  // Reset backoff on detection
         }
         handleWifiReconnect();
-    } else if (wifiState != WIFI_CONNECTED) {
-        wifiState = WIFI_CONNECTED;
+    } else if (wifiState != WIFI_STATE_CONNECTED) {
+        wifiState = WIFI_STATE_CONNECTED;
         wifiBackoffLevel = 0;
         Serial.print("WiFi reconnected. IP: ");
         Serial.println(WiFi.localIP());
@@ -151,16 +151,16 @@ void MqttHandler::tick() {
     
     // Check MQTT status
     if (!mqttClient.connected()) {
-        if (mqttState == MQTT_CONNECTED) {
+        if (mqttState == MQTT_STATE_CONNECTED) {
             Serial.println("MQTT disconnected!");
-            mqttState = MQTT_DISCONNECTED;
+            mqttState = MQTT_STATE_DISCONNECTED;
             lastMqttAttempt = millis();
         }
-        if (wifiState == WIFI_CONNECTED) {
+        if (wifiState == WIFI_STATE_CONNECTED) {
             handleMqttReconnect();
         }
-    } else if (mqttState != MQTT_CONNECTED) {
-        mqttState = MQTT_CONNECTED;
+    } else if (mqttState != MQTT_STATE_CONNECTED) {
+        mqttState = MQTT_STATE_CONNECTED;
         mqttBackoffLevel = 0;
         Serial.println("MQTT connected!");
         
@@ -226,7 +226,7 @@ void MqttHandler::publishReading(float catWeight, float poopWeight, int duration
 
 // Internal: Publish a single topic (handles queuing if offline)
 bool MqttHandler::publishTopic(const char* topic, const char* payload, bool retain) {
-    if (mqttState != MQTT_CONNECTED) {
+    if (mqttState != MQTT_STATE_CONNECTED) {
         // Queue the publish
         if (queueCount < MQTT_QUEUE_DEPTH) {
             int newTail = (queueTail + 1) % MQTT_QUEUE_DEPTH;
@@ -352,11 +352,11 @@ void MqttHandler::drainQueue() {
 
 // Internal: Handle MQTT reconnection with exponential backoff
 void MqttHandler::handleMqttReconnect() {
-    if (mqttState == MQTT_CONNECTING || mqttState == MQTT_CONNECTED) {
+    if (mqttState == MQTT_STATE_CONNECTING || mqttState == MQTT_STATE_CONNECTED) {
         return;  // Already connecting or connected
     }
     
-    if (wifiState != WIFI_CONNECTED) {
+    if (wifiState != WIFI_STATE_CONNECTED) {
         return;  // WiFi not connected
     }
     
@@ -371,16 +371,16 @@ void MqttHandler::handleMqttReconnect() {
     Serial.print(mqttBackoffLevel);
     Serial.println(")");
     
-    mqttState = MQTT_CONNECTING;
+    mqttState = MQTT_STATE_CONNECTING;
     lastMqttAttempt = now;
     
     // Attempt connection
     if (mqttClient.connect(DEVICE_UNIQUE_ID, HA_MQTT_USERNAME, HA_MQTT_PASSWORD)) {
-        mqttState = MQTT_CONNECTED;
+        mqttState = MQTT_STATE_CONNECTED;
         mqttBackoffLevel = 0;  // Reset backoff
         Serial.println("MQTT connected!");
     } else {
-        mqttState = MQTT_DISCONNECTED;
+        mqttState = MQTT_STATE_DISCONNECTED;
         mqttBackoffLevel = min(mqttBackoffLevel + 1, 4);  // Cap at level 4 (10 minutes)
         Serial.print("MQTT connection failed, code: ");
         Serial.println(mqttClient.state());
@@ -389,7 +389,7 @@ void MqttHandler::handleMqttReconnect() {
 
 // Internal: Handle WiFi reconnection with exponential backoff
 void MqttHandler::handleWifiReconnect() {
-    if (wifiState == WIFI_CONNECTING) {
+    if (wifiState == WIFI_STATE_CONNECTING) {
         return;  // Already connecting
     }
     
@@ -408,7 +408,7 @@ void MqttHandler::handleWifiReconnect() {
     Serial.print(wifiBackoffLevel);
     Serial.println(")");
     
-    wifiState = WIFI_CONNECTING;
+    wifiState = WIFI_STATE_CONNECTING;
     lastWifiAttempt = now;
     
     WiFi.reconnect();
@@ -450,7 +450,7 @@ void MqttHandler::addJitter(unsigned long& delay) {
 // Internal: Publish diagnostic sensors
 void MqttHandler::publishDiagnostics() {
     // Only publish diagnostics if MQTT is connected - don't queue them
-    if (mqttState != MQTT_CONNECTED) {
+    if (mqttState != MQTT_STATE_CONNECTED) {
         return;
     }
     
@@ -470,7 +470,7 @@ void MqttHandler::publishDiagnostics() {
     // MQTT connection status
     snprintf(topic, sizeof(topic), "%s/sensor/%s/mqtt_connected/state", 
              HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
-    snprintf(payload, sizeof(payload), "%s", mqttState == MQTT_CONNECTED ? "true" : "false");
+    snprintf(payload, sizeof(payload), "%s", mqttState == MQTT_STATE_CONNECTED ? "true" : "false");
     mqttClient.publish(topic, payload, false);
     
     // Uptime (in seconds)
@@ -488,7 +488,7 @@ MqttConnectionState MqttHandler::getConnectionStatus() {
 
 // Check if MQTT is connected
 bool MqttHandler::isConnected() {
-    return mqttState == MQTT_CONNECTED;
+    return mqttState == MQTT_STATE_CONNECTED;
 }
 
 // Get device uptime in seconds
