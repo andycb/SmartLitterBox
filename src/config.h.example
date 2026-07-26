@@ -40,7 +40,10 @@
 #define DEVICE_NAME         "Smart Litter Tray"
 
 // Device version (use date format: YYYY.MM.DD)
-#define DEVICE_VERSION      "2025.07.26"
+#define DEVICE_VERSION      "2026.07.26"
+
+// Device hardware version
+#define DEVICE_HARDWARE_VERSION "1.0"
 
 // Device manufacturer
 #define DEVICE_MANUFACTURER "andycb"

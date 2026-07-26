@@ -86,7 +86,7 @@ public:
     void tick();  // Called every loop iteration
     
     // Publishing methods
-    void publishReading(float catWeight, float poopWeight, int durationMs);
+    void publishReading(float catWeight, float poopWeight, int durationMs, unsigned long ageMs = 0);
     
     // Status methods
     MqttConnectionState getConnectionStatus();
@@ -164,10 +164,11 @@ void MqttHandler::tick() {
         mqttBackoffLevel = 0;
         Serial.println("MQTT connected!");
         
-        // Send discovery payloads on successful connection
+    // Send discovery payloads on successful connection
         sendDiscoveryPayload("cat_weight", "Cat Weight", "kg");
         sendDiscoveryPayload("poop_weight", "Poop Weight", "kg");
         sendDiscoveryPayload("poop_duration", "Poop Duration", "s");
+        sendDiscoveryPayload("data_age", "Data Age", "s");
         sendDiscoveryPayload("wifi_rssi", "WiFi Signal", "dBm");
         sendDiscoveryPayload("mqtt_connected", "MQTT Connected", "");
         sendDiscoveryPayload("uptime", "Uptime", "s");
@@ -190,11 +191,13 @@ void MqttHandler::tick() {
 }
 
 // Publish a cat litter usage reading
-void MqttHandler::publishReading(float catWeight, float poopWeight, int durationMs) {
+void MqttHandler::publishReading(float catWeight, float poopWeight, int durationMs, unsigned long ageMs) {
     char topic[MQTT_MAX_TOPIC_LEN];
     char payload[MQTT_MAX_PAYLOAD_LEN];
     
-    Serial.println("Publishing reading...");
+    Serial.print("Publishing reading (age: ");
+    Serial.print(ageMs / 1000);
+    Serial.println(" s)");
     
     // Publish cat weight
     snprintf(topic, sizeof(topic), "%s/sensor/%s/cat_weight/state", 
@@ -212,6 +215,12 @@ void MqttHandler::publishReading(float catWeight, float poopWeight, int duration
     snprintf(topic, sizeof(topic), "%s/sensor/%s/poop_duration/state", 
              HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
     snprintf(payload, sizeof(payload), "%d", durationMs / 1000);  // Convert to seconds
+    publishTopic(topic, payload, false);
+    
+    // Publish data age (time from queue to publish)
+    snprintf(topic, sizeof(topic), "%s/sensor/%s/data_age/state", 
+             HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
+    snprintf(payload, sizeof(payload), "%lu", ageMs / 1000);  // Convert to seconds
     publishTopic(topic, payload, false);
 }
 
@@ -269,11 +278,11 @@ void MqttHandler::sendDiscoveryPayload(const char* sensorId, const char* sensorN
         "{\"name\":\"%s\","
         "\"unique_id\":\"%s_%s\","
         "\"state_topic\":\"%s/sensor/%s/%s/state\","
-        "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"manufacturer\":\"%s\",\"sw_version\":\"%s\"}",
+        "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"manufacturer\":\"%s\",\"sw_version\":\"%s\",\"hw_version\":\"%s\"}",
         sensorName,
         DEVICE_UNIQUE_ID, sensorId,
         HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID, sensorId,
-        DEVICE_UNIQUE_ID, DEVICE_NAME, DEVICE_MANUFACTURER, DEVICE_VERSION);
+        DEVICE_UNIQUE_ID, DEVICE_NAME, DEVICE_MANUFACTURER, DEVICE_VERSION, DEVICE_HARDWARE_VERSION);
     
     // Add unit of measurement if specified
     if (strlen(unitOfMeasure) > 0) {
@@ -296,15 +305,35 @@ void MqttHandler::drainQueue() {
     unsigned long drainStart = millis();
     
     while (queueCount > 0 && (millis() - drainStart) < 5000) {  // Max 5 second drain window
-        if (!mqttClient.publish(publishQueue[queueHead].topic, 
-                                 publishQueue[queueHead].payload, 
-                                 publishQueue[queueHead].retain)) {
+        // Calculate age for queued items (time spent in queue + any prior age)
+        unsigned long currentAge_ms = millis() - publishQueue[queueHead].timestamp;
+        
+        // For data_age topics, use the calculated age; for others, use stored payload
+        char publishPayload[MQTT_MAX_PAYLOAD_LEN];
+        bool isAgeMetric = false;
+        
+        if (strstr(publishQueue[queueHead].topic, "/data_age/state") != NULL) {
+            isAgeMetric = true;
+            snprintf(publishPayload, sizeof(publishPayload), "%lu", currentAge_ms / 1000);
+        } else {
+            strncpy(publishPayload, publishQueue[queueHead].payload, sizeof(publishPayload) - 1);
+            publishPayload[sizeof(publishPayload) - 1] = '\0';
+        }
+        
+        if (!mqttClient.publish(publishQueue[queueHead].topic, publishPayload, publishQueue[queueHead].retain)) {
             // Publish failed, stop draining
             break;
         }
         
-        Serial.print("Drained queued publish: ");
-        Serial.println(publishQueue[queueHead].topic);
+        if (isAgeMetric) {
+            Serial.print("Drained queued publish (");
+            Serial.print(currentAge_ms / 1000);
+            Serial.print("s old): ");
+            Serial.println(publishQueue[queueHead].topic);
+        } else {
+            Serial.print("Drained queued publish: ");
+            Serial.println(publishQueue[queueHead].topic);
+        }
         
         queueHead = (queueHead + 1) % MQTT_QUEUE_DEPTH;
         queueCount--;
