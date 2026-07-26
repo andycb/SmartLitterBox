@@ -449,6 +449,11 @@ void MqttHandler::addJitter(unsigned long& delay) {
 
 // Internal: Publish diagnostic sensors
 void MqttHandler::publishDiagnostics() {
+    // Only publish diagnostics if MQTT is connected - don't queue them
+    if (mqttState != MQTT_CONNECTED) {
+        return;
+    }
+    
     char topic[MQTT_MAX_TOPIC_LEN];
     char payload[MQTT_MAX_PAYLOAD_LEN];
     
@@ -458,7 +463,7 @@ void MqttHandler::publishDiagnostics() {
         snprintf(topic, sizeof(topic), "%s/sensor/%s/wifi_rssi/state", 
                  HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
         snprintf(payload, sizeof(payload), "%d", rssi);
-        publishTopic(topic, payload, false);
+        mqttClient.publish(topic, payload, false);
         lastWifiRssi = rssi;
     }
     
@@ -466,14 +471,14 @@ void MqttHandler::publishDiagnostics() {
     snprintf(topic, sizeof(topic), "%s/sensor/%s/mqtt_connected/state", 
              HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
     snprintf(payload, sizeof(payload), "%s", mqttState == MQTT_CONNECTED ? "true" : "false");
-    publishTopic(topic, payload, false);
+    mqttClient.publish(topic, payload, false);
     
     // Uptime (in seconds)
     unsigned long uptime = getUptime();
     snprintf(topic, sizeof(topic), "%s/sensor/%s/uptime/state", 
              HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
     snprintf(payload, sizeof(payload), "%lu", uptime);
-    publishTopic(topic, payload, false);
+    mqttClient.publish(topic, payload, false);
 }
 
 // Get current MQTT connection status
