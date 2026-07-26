@@ -2,7 +2,7 @@
 
 SmartLitterBox::SmartLitterBox() 
 {
-    this->m_litterScale = LitterScale();
+    // m_litterScale is default-initialized as a member variable
     
     MethodSlot<SmartLitterBox, float> memFunSlot(this, &SmartLitterBox::OnWeightUpdated);
     this->m_litterScale.WeightChanged.attach(memFunSlot);
