@@ -442,9 +442,9 @@ unsigned long MqttHandler::getBackoffDelay(int backoffLevel, bool isWifi) {
 
 // Internal: Add ±10% jitter to delay
 void MqttHandler::addJitter(unsigned long& delay) {
-    // Generate random jitter: ±10%
-    int jitterPercent = random(-10, 11);  // -10 to +10
-    delay = delay + (delay * jitterPercent / 100);
+    // Generate random jitter: ±10% (multiplier from 0.9 to 1.1)
+    int jitterMultiplier = random(90, 111);  // 90 to 110 (representing 0.9x to 1.1x)
+    delay = (delay * jitterMultiplier) / 100;
 }
 
 // Internal: Publish diagnostic sensors
