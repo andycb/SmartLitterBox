@@ -301,12 +301,21 @@ void MqttHandler::sendDiscoveryPayload(const char* sensorId, const char* sensorN
         strncat(payload, "\"", sizeof(payload) - strlen(payload) - 1);
     }
     
+    // Close the JSON object
     strncat(payload, "}", sizeof(payload) - strlen(payload) - 1);
     
-    // Publish with retain flag
-    mqttClient.publish(topic, payload, true);
+    // Debug: Print the discovery payload
+    Serial.print("Discovery topic: ");
+    Serial.println(topic);
+    Serial.print("Discovery payload: ");
+    Serial.println(payload);
+    
+    // Publish with retain flag (true = broker keeps this message for new subscribers)
+    bool success = mqttClient.publish(topic, payload, true);
     Serial.print("Published discovery: ");
-    Serial.println(sensorId);
+    Serial.print(sensorId);
+    Serial.print(" - ");
+    Serial.println(success ? "OK" : "FAILED");
 }
 
 // Internal: Drain the publish queue
