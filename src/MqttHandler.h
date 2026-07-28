@@ -46,7 +46,13 @@ struct MqttQueueEntry {
 
 class MqttHandler {
 private:
-    WiFiClientSecure espClient;
+    // Use WiFiClient for plain MQTT (port 1883), WiFiClientSecure for TLS (port 8883)
+    #if HA_MQTT_PORT == 1883
+        WiFiClient espClient;
+    #else
+        WiFiClientSecure espClient;
+    #endif
+    
     PubSubClient mqttClient;
     
     // Connection state tracking
@@ -123,9 +129,13 @@ void MqttHandler::setup() {
     mqttClient.setServer(HA_MQTT_SERVER, HA_MQTT_PORT);
     mqttClient.setBufferSize(512);
     
-    // Configure SSL/TLS with Mozilla root CA
-    // Using insecure mode for testing - replace with proper certificate in production
-    espClient.setInsecure();
+    // Configure TLS for secure MQTT (port 8883 and above)
+    #if HA_MQTT_PORT >= 8883
+        Serial.println("Using secure MQTT (TLS)");
+        espClient.setInsecure();  // Skip cert validation for self-signed certs
+    #else
+        Serial.println("Using plain MQTT (no TLS)");
+    #endif
     
     // Initial WiFi connection attempt
     handleWifiReconnect();
