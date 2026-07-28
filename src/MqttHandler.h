@@ -371,6 +371,18 @@ void MqttHandler::handleMqttReconnect() {
     Serial.print(mqttBackoffLevel);
     Serial.println(")");
     
+    // Debug output
+    Serial.print("  Server: ");
+    Serial.print(HA_MQTT_SERVER);
+    Serial.print(":");
+    Serial.println(HA_MQTT_PORT);
+    Serial.print("  Client ID: ");
+    Serial.println(DEVICE_UNIQUE_ID);
+    Serial.print("  Username: ");
+    Serial.println(HA_MQTT_USERNAME);
+    Serial.print("  Password: ");
+    Serial.println(HA_MQTT_PASSWORD);
+    
     mqttState = MQTT_STATE_CONNECTING;
     lastMqttAttempt = now;
     
@@ -383,7 +395,25 @@ void MqttHandler::handleMqttReconnect() {
         mqttState = MQTT_STATE_DISCONNECTED;
         mqttBackoffLevel = min(mqttBackoffLevel + 1, 4);  // Cap at level 4 (10 minutes)
         Serial.print("MQTT connection failed, code: ");
-        Serial.println(mqttClient.state());
+        Serial.print(mqttClient.state());
+        Serial.print(" (");
+        
+        // Print human-readable error
+        int state = mqttClient.state();
+        switch(state) {
+            case -4: Serial.print("MQTT_CONNECTION_TIMEOUT"); break;
+            case -3: Serial.print("MQTT_CONNECTION_LOST"); break;
+            case -2: Serial.print("MQTT_CONNECT_FAILED - wrong credentials or broker rejected"); break;
+            case -1: Serial.print("MQTT_DISCONNECTED"); break;
+            case 0: Serial.print("MQTT_CONNECTED"); break;
+            case 1: Serial.print("MQTT_CONNECT_BAD_PROTOCOL"); break;
+            case 2: Serial.print("MQTT_CONNECT_BAD_CLIENT_ID"); break;
+            case 3: Serial.print("MQTT_CONNECT_UNAVAILABLE"); break;
+            case 4: Serial.print("MQTT_CONNECT_BAD_CREDENTIALS"); break;
+            case 5: Serial.print("MQTT_CONNECT_UNAUTHORIZED"); break;
+            default: Serial.print("MQTT_UNKNOWN_ERROR"); break;
+        }
+        Serial.println(")");
     }
 }
 
@@ -407,6 +437,8 @@ void MqttHandler::handleWifiReconnect() {
     Serial.print("Attempting WiFi connection (backoff level ");
     Serial.print(wifiBackoffLevel);
     Serial.println(")");
+    Serial.print("  Current WiFi status: ");
+    Serial.println(WiFi.status());  // 0=idle, 1=connecting, 2=wrong pass, 3=no ssid, 4=connect fail, 5=connected
     
     wifiState = WIFI_STATE_CONNECTING;
     lastWifiAttempt = now;
