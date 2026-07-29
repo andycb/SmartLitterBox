@@ -92,7 +92,7 @@ public:
     void tick();  // Called every loop iteration
     
     // Publishing methods
-    void publishReading(float catWeight, float poopWeight, int durationMs, unsigned long ageMs = 0);
+    void publishReading(float catWeight, float poopWeight, int duration, unsigned long ageMs = 0);
     
     // Status methods
     MqttConnectionState getConnectionStatus();
@@ -201,7 +201,7 @@ void MqttHandler::tick() {
 }
 
 // Publish a cat litter usage reading
-void MqttHandler::publishReading(float catWeight, float poopWeight, int durationMs, unsigned long ageMs) {
+void MqttHandler::publishReading(float catWeight, float poopWeight, int duration, unsigned long ageMs) {
     char topic[MQTT_MAX_TOPIC_LEN];
     char payload[MQTT_MAX_PAYLOAD_LEN];
     
@@ -224,7 +224,7 @@ void MqttHandler::publishReading(float catWeight, float poopWeight, int duration
     // Publish duration
     snprintf(topic, sizeof(topic), "%s/sensor/%s/poop_duration/state", 
              HA_MQTT_TOPIC_PREFIX, DEVICE_UNIQUE_ID);
-    snprintf(payload, sizeof(payload), "%d", durationMs / 1000);  // Convert to seconds
+    snprintf(payload, sizeof(payload), "%d", duration);  // Convert to seconds
     publishTopic(topic, payload, false);
     
     // Publish data age (time from queue to publish)
@@ -410,6 +410,14 @@ void MqttHandler::handleMqttReconnect() {
         mqttState = MQTT_STATE_CONNECTED;
         mqttBackoffLevel = 0;  // Reset backoff
         Serial.println("MQTT connected!");
+
+        sendDiscoveryPayload("cat_weight", "Cat Weight", "kg");
+        sendDiscoveryPayload("poop_weight", "Poop Weight", "kg");
+        sendDiscoveryPayload("poop_duration", "Poop Duration", "s");
+        sendDiscoveryPayload("data_age", "Data Age", "s");
+        sendDiscoveryPayload("wifi_rssi", "WiFi Signal", "dBm");
+        sendDiscoveryPayload("mqtt_connected", "MQTT Connected", "");
+        sendDiscoveryPayload("uptime", "Uptime", "s");
     } else {
         mqttState = MQTT_STATE_DISCONNECTED;
         mqttBackoffLevel = min(mqttBackoffLevel + 1, 4);  // Cap at level 4 (10 minutes)
