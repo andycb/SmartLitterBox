@@ -1,112 +1,76 @@
 #include <ESP8266WiFi.h>
-#include "Adafruit_MQTT.h"
-#include "Adafruit_MQTT_Client.h"
-
-#include <ESP8266WiFiMulti.h>
-#include <ESP8266HTTPClient.h>
-#include <ESP8266httpUpdate.h>
-#include <time.h>
+#include <PubSubClient.h>
 #include <Callback.h>
 
+#include "config.h"
+#include "MqttHandler.h"
 #include "SmartLitterBox.h"
 
-/******************************** Setup *************************************/
+// Forward declaration
+void OnNewReading(CatLitterUse catLitterUse);
 
-#define WLAN_SSID       ""
-#define WLAN_PASS       ""
+// MQTT handler instance
+MqttHandler mqttHandler;
 
-#define AIO_SERVER      "io.adafruit.com"
-#define AIO_SERVERPORT  8883
-#define AIO_USERNAME    ""
-#define AIO_KEY         ""
-
-/****************************************************************************/
-
-// WiFiFlientSecure for SSL/TLS support
-WiFiClientSecure client;
-
-// Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
-Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
-
-// io.adafruit.com SHA1 fingerprint
-static const char *fingerprint PROGMEM = "4E C1 52 73 24 A8 36 D6 7A 4C 67 C7 91 0C 0A 22 B9 2D 5B CA";
-
-Adafruit_MQTT_Publish catWeightFeed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/catWeight");
-Adafruit_MQTT_Publish poopWeightFeed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/poopWeight");
-Adafruit_MQTT_Publish poopDurationFeed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/poopDuration");
-
-SmartLitterBox smartLitterBox = SmartLitterBox();
-
-void MQTT_connect()
-{
-    int8_t ret;
-
-    // Stop if already connected.
-    if (mqtt.connected()) 
-    {
-        return;
-    }
-
-    Serial.print("Connecting to MQTT... ");
-
-    uint8_t retries = 3;
-    while ((ret = mqtt.connect()) != 0) 
-    {
-        Serial.println(mqtt.connectErrorString(ret));
-        Serial.println("Retrying MQTT connection in 5 seconds...");
-        mqtt.disconnect();
-
-        delay(5000);  // wait 5 seconds
-        retries--;
-        if (retries == 0) 
-        {
-            // basically die and wait for WDT to reset
-            while (1);
-        }
-  }
-
-  Serial.println("MQTT Connected!");
-}
+// Smart Litter Box instance
+SmartLitterBox smartLitterBox;
 
 void setup() 
 {
     Serial.begin(9600);
+    
+    delay(1000);  // Give serial time to initialize
+    Serial.println("\n\nSmart Litter Box starting up...");
 
     // Turn off the WiFi AP
     WiFi.mode(WIFI_STA);
 
-    // Connect to wifi
+    // Connect to WiFi and initialize MQTT handler
+    Serial.print("Connecting to WiFi: ");
+    Serial.println(WLAN_SSID);
     WiFi.begin(WLAN_SSID, WLAN_PASS);
-    while (WiFi.status() != WL_CONNECTED)
-    {
+    
+    // Wait up to 30 seconds for initial WiFi connection
+    int retries = 60;  // 30 seconds (60 * 500ms)
+    while (WiFi.status() != WL_CONNECTED && retries > 0) {
         delay(500);
         Serial.print(".");
+        retries--;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nWiFi connected");
+        Serial.print("IP address: ");
+        Serial.println(WiFi.localIP());
+    } else {
+        Serial.println("\nWiFi initial connection timeout - will retry with backoff");
     }
 
-    Serial.println("WiFi connected");
-    Serial.println("IP address: "); Serial.println(WiFi.localIP());
-
-    // check the fingerprint of io.adafruit.com's SSL cert
-    client.setFingerprint(fingerprint);
-  
-    MQTT_connect();
-  
+    // Initialize MQTT handler
+    mqttHandler.setup();
+    
+    // Attach callback for new litter box readings
     FunctionSlot<CatLitterUse> ptrSlot(OnNewReading);
     smartLitterBox.LitterUsage.attach(ptrSlot);
+    
+    Serial.println("Setup complete!");
 }
 
 void loop()
 {
+    // Tick smart litter box sensor logic
     smartLitterBox.Tick();
-    MQTT_connect();
+    
+    // Tick MQTT handler (manages WiFi/MQTT reconnection, queue draining, diagnostics)
+    mqttHandler.tick();
 }
 
 void OnNewReading(CatLitterUse catLitterUse)
 {
-    catWeightFeed.publish(catLitterUse.CatWeight);
-    poopWeightFeed.publish(catLitterUse.PoopWeight);
-    poopDurationFeed.publish(catLitterUse.Duration);
+    // Publish reading to Home Assistant via MQTT
+    mqttHandler.publishReading(catLitterUse.CatWeight, catLitterUse.PoopWeight, catLitterUse.Duration);
 
+    // Log reading to serial
     Serial.println("------------------------");
     Serial.print("Cat Weight = ");
     Serial.println(catLitterUse.CatWeight);
@@ -115,6 +79,7 @@ void OnNewReading(CatLitterUse catLitterUse)
     Serial.println(catLitterUse.PoopWeight);
 
     Serial.print("Duration = ");
-    Serial.println(catLitterUse.Duration);
+    Serial.print(catLitterUse.Duration);
+    Serial.println(" ms");
     Serial.println("------------------------");
 }

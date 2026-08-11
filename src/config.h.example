@@ -1,0 +1,77 @@
+/*
+ * Smart Litter Box Configuration Template
+ * 
+ * IMPORTANT: Copy this file to config.h and fill in your actual values.
+ * config.h is excluded from version control (.gitignore) to protect credentials.
+ */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+/********************** WiFi Configuration ****************************/
+
+// WiFi SSID (network name)
+#define WLAN_SSID       "your_ssid_here"
+
+// WiFi password
+#define WLAN_PASS       "your_password_here"
+
+/********************** Home Assistant MQTT Configuration ****************************/
+
+// Home Assistant MQTT broker address
+// Examples: "192.168.1.100", "mqtt.example.com", "homeassistant.local"
+#define HA_MQTT_SERVER      "192.168.1.100"
+
+// MQTT port (typically 1883 for non-TLS, 8883 for TLS)
+#define HA_MQTT_PORT        8883
+
+// MQTT broker username
+#define HA_MQTT_USERNAME    "ha_username"
+
+// MQTT broker password
+#define HA_MQTT_PASSWORD    "ha_password"
+
+// MQTT discovery topic prefix (standard Home Assistant default)
+#define HA_MQTT_TOPIC_PREFIX    "homeassistant"
+
+/********************** Device Identification ****************************/
+
+// Device name as it will appear in Home Assistant
+#define DEVICE_NAME         "Smart Litter Tray"
+
+// Device version (use date format: YYYY.MM.DD)
+#define DEVICE_VERSION      "2026.07.26"
+
+// Device hardware version
+#define DEVICE_HARDWARE_VERSION "1.0"
+
+// Device manufacturer
+#define DEVICE_MANUFACTURER "andycb"
+
+// Unique device identifier (must be unique across all your devices)
+// Used in MQTT topic paths and Home Assistant device identification
+// Examples: "smart_litter_tray_001", "slb_kitchen"
+#define DEVICE_UNIQUE_ID    "smart_litter_tray_001"
+
+/********************** Connection Resilience Configuration ****************************/
+
+// First MQTT connection retry delay (milliseconds)
+// After this, exponential backoff applies: 30s → 1m → 2m → 5m → 10m (capped)
+#define MQTT_RETRY_DELAY_MS         30000
+
+// WiFi reconnection base delay (milliseconds)
+// Applied before exponential backoff kicks in
+#define WIFI_RETRY_DELAY_MS         15000
+
+// Maximum backoff delay (milliseconds) - prevents indefinite waiting
+#define MAX_BACKOFF_DELAY_MS        600000  // 10 minutes
+
+// Local publish queue depth (max queued readings during offline periods)
+// Each entry stores ~100 bytes, so 50 = ~5KB RAM overhead
+#define MQTT_QUEUE_DEPTH            50
+
+// Diagnostic publish interval (milliseconds)
+// WiFi RSSI, MQTT status, and uptime published at this interval
+#define DIAGNOSTIC_PUBLISH_INTERVAL 60000   // 60 seconds
+
+#endif // CONFIG_H
